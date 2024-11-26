@@ -98,15 +98,6 @@ function App() {
           <p className="text-xl font-semibold text-blue-300 mb-4">Created by Atharv Hatwar</p>
           <div className="flex justify-center space-x-6">
             <a
-              href="https://github.com/atharv01h"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-400 hover:text-white transition-colors flex items-center"
-            >
-              <Github className="w-6 h-6 mr-2" />
-              GitHub
-            </a>
-            <a
               href="https://www.instagram.com/atharv_hatwar/"
               target="_blank"
               rel="noopener noreferrer"
