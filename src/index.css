@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Created by Atharv Hatwar */
+@layer base {
+  @font-face {
+    font-family: 'Times New Roman';
+    src: local('Times New Roman');
+  }
+
+  body {
+    font-family: 'Times New Roman', serif;
+  }
+}
+
+/* Created by Atharv Hatwar */
+.font-times {
+  font-family: 'Times New Roman', serif;
+}
+
+/* Created by Atharv Hatwar */
+.prose {
+  max-width: none;
+}
+
+/* Created by Atharv Hatwar */
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+  color: #fff;
+  font-family: 'Times New Roman', serif;
+}
+
+/* Created by Atharv Hatwar */
+.prose p {
+  color: #d1d5db;
+  font-family: 'Times New Roman', serif;
+}
