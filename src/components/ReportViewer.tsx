@@ -1,101 +1,179 @@
-// Created by Atharv Hatwar
-import React from 'react';
+import { useState, useCallback, type FC } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Download, Copy, FileText, FileImage } from 'lucide-react';
-import { exportToWord, exportToPDF } from '../utils/exportUtils';
+import { Download, Copy, FileText, Check, RotateCcw, FileDown, Hash } from 'lucide-react';
+import { exportToWord, exportToPDF, exportToMarkdown } from '../utils/exportUtils';
+import type { ExportFormat } from '../types';
 
-// Created by Atharv Hatwar
 interface ReportViewerProps {
   content: string;
   images: string[];
+  wordCount: number;
+  onReset: () => void;
 }
 
-// Created by Atharv Hatwar
-const ReportViewer: React.FC<ReportViewerProps> = ({ content, images }) => {
-  // Created by Atharv Hatwar
-  const handleDownload = (format: 'md' | 'docx' | 'pdf') => {
-    switch (format) {
-      case 'md':
-        const blob = new Blob([content], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'project-report.md';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        break;
-      case 'docx':
-        exportToWord(content, images);
-        break;
-      case 'pdf':
-        exportToPDF(content, images);
-        break;
+const ReportViewer: FC<ReportViewerProps> = ({ content, images, wordCount, onReset }) => {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedId('text');
+      setTimeout(() => setCopiedId(null), 2500);
+    } catch {
+      // Clipboard API not available
+      const textarea = document.createElement('textarea');
+      textarea.value = content;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopiedId('text');
+      setTimeout(() => setCopiedId(null), 2500);
     }
-  };
+  }, [content]);
 
-  // Created by Atharv Hatwar
-  const handleCopy = () => {
-    navigator.clipboard.writeText(content);
-  };
+  const handleExport = useCallback(
+    async (format: ExportFormat) => {
+      if (exportingFormat) return;
+      setExportingFormat(format);
+      try {
+        switch (format) {
+          case 'md':
+            exportToMarkdown(content);
+            break;
+          case 'docx':
+            await exportToWord(content, images);
+            break;
+          case 'pdf':
+            await exportToPDF(content, images);
+            break;
+        }
+      } catch (err) {
+        console.error(`Export to ${format} failed:`, err);
+      } finally {
+        setExportingFormat(null);
+      }
+    },
+    [content, images, exportingFormat]
+  );
 
-  // Created by Atharv Hatwar
   return (
-    <div className="bg-gray-800 rounded-lg shadow-xl p-6">
-      <div className="flex flex-wrap gap-4 justify-end mb-4">
-        <button
-          onClick={handleCopy}
-          className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center transition-all"
-        >
-          <Copy className="w-4 h-4 mr-2" />
-          Copy
-        </button>
-        <button
-          onClick={() => handleDownload('md')}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center transition-all"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Markdown
-        </button>
-        <button
-          onClick={() => handleDownload('docx')}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center transition-all"
-        >
-          <FileText className="w-4 h-4 mr-2" />
-          Word
-        </button>
-        <button
-          onClick={() => handleDownload('pdf')}
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center transition-all"
-        >
-          <FileText className="w-4 h-4 mr-2" />
-          PDF
-        </button>
-      </div>
+    <article className="report-viewer" aria-labelledby="report-heading">
+      {/* Toolbar */}
+      <div className="report-toolbar" role="toolbar" aria-label="Report actions">
+        <div className="report-meta">
+          <div className="report-badge">
+            <Hash size={12} aria-hidden="true" />
+            <span>{wordCount.toLocaleString()} words</span>
+          </div>
+          <div className="report-badge">
+            <FileText size={12} aria-hidden="true" />
+            <span>{images.length} images</span>
+          </div>
+        </div>
 
-      {images.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-xl font-bold mb-4">Related Images</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {images.map((image, index) => (
-              <img
-                key={index}
-                src={image}
-                alt={`Related image ${index + 1}`}
-                className="w-full h-48 object-cover rounded-lg"
-              />
+        <div className="toolbar-actions">
+          <button
+            onClick={onReset}
+            className="toolbar-btn toolbar-btn--ghost"
+            type="button"
+            aria-label="Generate a new report"
+            title="New report"
+          >
+            <RotateCcw size={15} aria-hidden="true" />
+            <span>New Report</span>
+          </button>
+
+          <button
+            onClick={handleCopy}
+            className={`toolbar-btn toolbar-btn--secondary ${copiedId === 'text' ? 'toolbar-btn--success' : ''}`}
+            type="button"
+            aria-label={copiedId === 'text' ? 'Copied!' : 'Copy report to clipboard'}
+            aria-pressed={copiedId === 'text'}
+          >
+            {copiedId === 'text' ? (
+              <Check size={15} aria-hidden="true" />
+            ) : (
+              <Copy size={15} aria-hidden="true" />
+            )}
+            <span>{copiedId === 'text' ? 'Copied!' : 'Copy'}</span>
+          </button>
+
+          <div className="export-group" role="group" aria-label="Download report">
+            <span className="export-label">
+              <Download size={13} aria-hidden="true" />
+              Download:
+            </span>
+            {(['md', 'docx', 'pdf'] as ExportFormat[]).map((fmt) => (
+              <button
+                key={fmt}
+                onClick={() => handleExport(fmt)}
+                disabled={exportingFormat !== null}
+                className={`toolbar-btn toolbar-btn--export toolbar-btn--${fmt}`}
+                type="button"
+                aria-label={`Download as ${fmt.toUpperCase()}`}
+                aria-busy={exportingFormat === fmt}
+              >
+                {exportingFormat === fmt ? (
+                  <FileDown size={14} className="pulse" aria-hidden="true" />
+                ) : (
+                  <FileDown size={14} aria-hidden="true" />
+                )}
+                <span>{fmt.toUpperCase()}</span>
+              </button>
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Images */}
+      {images.length > 0 && (
+        <section className="images-section" aria-labelledby="images-heading">
+          <h2 id="images-heading" className="images-heading">
+            Related Images
+          </h2>
+          <div className="images-grid" role="list">
+            {images.map((src, i) => (
+              <figure key={i} className="image-figure" role="listitem">
+                <img
+                  src={src}
+                  alt={`Related image ${i + 1}`}
+                  className="report-image"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </figure>
+            ))}
+          </div>
+        </section>
       )}
 
-      <div className="prose prose-invert max-w-none">
-        <ReactMarkdown>{content}</ReactMarkdown>
+      {/* Report content */}
+      <div className="report-content" id="report-heading">
+        <ReactMarkdown
+          components={{
+            h1: ({ children }) => <h1 className="md-h1">{children}</h1>,
+            h2: ({ children }) => <h2 className="md-h2">{children}</h2>,
+            h3: ({ children }) => <h3 className="md-h3">{children}</h3>,
+            p: ({ children }) => <p className="md-p">{children}</p>,
+            ul: ({ children }) => <ul className="md-ul">{children}</ul>,
+            ol: ({ children }) => <ol className="md-ol">{children}</ol>,
+            li: ({ children }) => <li className="md-li">{children}</li>,
+            strong: ({ children }) => <strong className="md-strong">{children}</strong>,
+            em: ({ children }) => <em className="md-em">{children}</em>,
+            hr: () => <hr className="md-hr" />,
+            blockquote: ({ children }) => (
+              <blockquote className="md-blockquote">{children}</blockquote>
+            ),
+            code: ({ children }) => <code className="md-code">{children}</code>,
+          }}
+        >
+          {content}
+        </ReactMarkdown>
       </div>
-    </div>
+    </article>
   );
 };
 
-// Created by Atharv Hatwar
 export default ReportViewer;
