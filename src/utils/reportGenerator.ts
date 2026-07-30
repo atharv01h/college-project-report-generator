@@ -1,63 +1,97 @@
-// Created by Atharv Hatwar
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { REPORT_SECTIONS } from '../constants/sections';
+import type { GenerationProgress } from '../types';
 
-// Created by Atharv Hatwar
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
-
-// Created by Atharv Hatwar
-export async function generateReport(topic: string): Promise<string> {
-  // Created by Atharv Hatwar
-  const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-
-  // Created by Atharv Hatwar
-  const sections = [
-    {
-      title: 'Executive Summary and Introduction',
-      prompt: `Generate a detailed executive summary and introduction for a project report on "${topic}".
-      Include background information, project objectives, and scope. (Aim for 1,500 words)`
-    },
-    {
-      title: 'Literature Review',
-      prompt: `Generate a comprehensive literature review for a project on "${topic}".
-      Cover current state of the field, related work, and theoretical framework. (Aim for 1,500 words)`
-    },
-    {
-      title: 'Methodology',
-      prompt: `Generate a detailed methodology section for a project on "${topic}".
-      Include research design, data collection methods, and analysis approaches. (Aim for 1,500 words)`
-    },
-    {
-      title: 'Results and Analysis',
-      prompt: `Generate detailed results and analysis for a project on "${topic}".
-      Include key findings, data analysis, and interpretation. (Aim for 1,500 words)`
-    },
-    {
-      title: 'Discussion and Implications',
-      prompt: `Generate a thorough discussion and implications section for a project on "${topic}".
-      Cover theoretical and practical implications, limitations, and future directions. (Aim for 1,500 words)`
-    }
-  ];
-
-  // Created by Atharv Hatwar
-  try {
-    let fullReport = '# Project Report\n\n';
-
-    // Created by Atharv Hatwar
-    for (const section of sections) {
-      const result = await model.generateContent(
-        `${section.prompt}\n\nFormat the response in proper Markdown with appropriate headings (#, ##, ###) and paragraphs.
-        Make it professional and academic. Include relevant technical details and citations.`
-      );
-      const response = await result.response;
-      const text = response.text();
-      fullReport += text + '\n\n';
-    }
-
-    // Created by Atharv Hatwar
-    return fullReport;
-  } catch (error) {
-    // Created by Atharv Hatwar
-    console.error('Error generating report:', error);
-    throw error;
+/**
+ * Validates that the Gemini API key is configured.
+ * Throws a user-friendly error if not.
+ */
+function getApiKey(): string {
+  const key = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!key || key === 'your_gemini_api_key_here') {
+    throw new Error(
+      'Gemini API key is not configured. Please create a .env file with VITE_GEMINI_API_KEY set to your API key. ' +
+      'Get a free key at https://aistudio.google.com/app/apikey'
+    );
   }
+  return key;
+}
+
+/**
+ * Generates a comprehensive academic project report using Google Gemini AI.
+ *
+ * @param topic - The project topic to generate a report for
+ * @param onProgress - Optional callback called after each section completes
+ * @returns Full report content in Markdown format
+ */
+export async function generateReport(
+  topic: string,
+  onProgress?: (progress: GenerationProgress) => void
+): Promise<string> {
+  const trimmedTopic = topic.trim();
+  if (!trimmedTopic) {
+    throw new Error('Please enter a valid project topic.');
+  }
+
+  const apiKey = getApiKey();
+  const genAI = new GoogleGenerativeAI(apiKey);
+
+  // Use gemini-1.5-flash: fast, accurate, available on free tier
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+  const total = REPORT_SECTIONS.length;
+  let fullReport = `# Project Report: ${trimmedTopic}\n\n`;
+
+  // Build a table of contents header
+  fullReport += `## Table of Contents\n\n`;
+  REPORT_SECTIONS.forEach((section, i) => {
+    fullReport += `${i + 1}. ${section.title}\n`;
+  });
+  fullReport += '\n---\n\n';
+
+  for (let i = 0; i < total; i++) {
+    const section = REPORT_SECTIONS[i];
+    const prompt = section.prompt.replace('{topic}', trimmedTopic);
+
+    // Report progress before starting each section
+    onProgress?.({
+      current: i,
+      total,
+      sectionTitle: section.title,
+      percentage: Math.round((i / total) * 100),
+    });
+
+    const result = await model.generateContent(
+      `${prompt}\n\n` +
+      `Format the response in proper Markdown with appropriate headings (##, ###) and paragraphs.\n` +
+      `Be professional, academic, and technically detailed. Do not include a top-level title — ` +
+      `start directly with a ## heading for the section title.\n` +
+      `Include concrete examples, technical terminology, and well-structured arguments.`
+    );
+
+    const text = result.response.text();
+    fullReport += text + '\n\n';
+
+    // Report progress after section completes
+    onProgress?.({
+      current: i + 1,
+      total,
+      sectionTitle: section.title,
+      percentage: Math.round(((i + 1) / total) * 100),
+    });
+  }
+
+  return fullReport;
+}
+
+/**
+ * Counts the approximate number of words in a markdown string.
+ */
+export function countWords(content: string): number {
+  return content
+    .replace(/#{1,6}\s/g, '')  // strip heading markers
+    .replace(/[*_`~]/g, '')     // strip formatting chars
+    .split(/\s+/)
+    .filter(Boolean)
+    .length;
 }
